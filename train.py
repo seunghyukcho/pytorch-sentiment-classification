@@ -10,8 +10,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model import CoNAL
-from dataset import Dataset
+from dataset import Dataset, PadBatch
 from arguments import get_task_parser, add_train_args
 
 
@@ -30,29 +29,27 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     add_train_args(parser)
-    getattr(model_module, 'add_model_args')
-    getattr(tokenizer_module, 'add_tokenizer_args')
+    getattr(model_module, 'add_model_args')(parser)
+    getattr(tokenizer_module, 'add_tokenizer_args')(parser)
     args = parser.parse_args()
 
     # Seed settings
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
     print('Loading tokenizer...')
     tokenizer = tokenizer(args)
 
     print('Loading train dataset...')
     train_dataset = Dataset(args.train_data, tokenizer=tokenizer, label=True)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=PadBatch())
 
     print('Loading validation dataset...')
     valid_dataset = Dataset(args.valid_data, tokenizer=tokenizer, label=True)
-    valid_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size)
+    valid_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, collate_fn=PadBatch())
 
     print('Building model...')
-    model = model(args, embd_dim=tokenizer.get_embedding_dimension())
+    model = model(args, vocab_size=tokenizer.get_vocab_size() + 1)
     model = model.to(args.device)
 
     # Ignore annotators labeling which is -1
@@ -66,12 +63,12 @@ if __name__ == "__main__":
         train_loss = 0.0
         train_correct = 0
         model.train()
-        for x, y in train_loader:
+        for x, y, lens in train_loader:
             model.zero_grad()
 
             # Move the parameters to device given by argument
-            x, y = x.to(args.device), y.to(args.device)
-            pred = model(x)
+            x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
+            pred = model(x, lens)
 
             # Calculate loss of annotators' labeling
             loss = criterion(pred, y.view(-1))
@@ -89,9 +86,9 @@ if __name__ == "__main__":
         with torch.no_grad():
             valid_correct = 0
             model.eval()
-            for x, y in valid_loader:
-                x, y = x.to(args.device), y.to(args.device)
-                pred = model(x)
+            for x, y, lens in valid_loader:
+                x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
+                pred = model(x, lens)
                 pred = torch.argmax(pred, dim=1)
                 valid_correct += torch.sum(torch.eq(pred, y)).item()
 
@@ -114,9 +111,7 @@ if __name__ == "__main__":
             checkpoint_dir = Path(args.save_dir)
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
             torch.save({
-                'auxiliary_network': model.auxiliary_network.state_dict(),
-                'noise_adaptation_layer': model.noise_adaptation_layer.state_dict(),
-                'classifier': model.classifier.state_dict()
+                'model': model.state_dict()
             }, checkpoint_dir / 'best_model.pth')
 
             with open(checkpoint_dir / 'args.json', 'w') as f:
