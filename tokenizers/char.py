@@ -2,9 +2,16 @@ import re
 import numpy as np
 
 
+def add_tokenizer_args(parser):
+    group = parser.add_argument_group('tokenizer')
+
+
 class Tokenizer():
-    def __init__(self):
+    def __init__(self, args):
         self.dict = {}
+
+    def get_embedding_dimension(self):
+        return ord('z') - ord('a') + 1
 
     def tokenize(self, sentence):
         regex = re.compile('[^a-zA-Z]')
