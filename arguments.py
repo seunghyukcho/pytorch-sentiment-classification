@@ -27,12 +27,16 @@ def add_train_args(parser):
                        help="Root directory of train data.")
     group.add_argument('--valid_data', type=str,
                        help="Root directory of validation data.")
+    group.add_argument('--n_classes', type=int, default=5,
+                       help="Number of classes.")
     group.add_argument('--device', type=str, choices=['cpu', 'cuda'],
                        help="Device going to use for training.")
     group.add_argument('--save_dir', type=str, default='checkpoints/',
                        help="Folder going to save model checkpoints.")
     group.add_argument('--log_dir', type=str, default='logs/',
                        help="Folder going to save logs.")
+    parser.add_argument('--model', type=str, choices=models)
+    parser.add_argument('--tokenizer', type=str, choices=tokenizers)
 
 
 def add_test_args(parser):

@@ -10,7 +10,7 @@ class Tokenizer():
     def __init__(self, args):
         self.dict = {}
 
-    def get_embedding_dimension(self):
+    def get_vocab_size(self):
         return ord('z') - ord('a') + 1
 
     def tokenize(self, sentence):
@@ -20,10 +20,8 @@ class Tokenizer():
 
         tokens = []
         for ch in sentence:
-            tokens.append(ord(ch) - ord('a'))
+            tokens.append(ord(ch) - ord('a') + 1)
 
         tokens = np.array(tokens)
-        tokens = np.eye(ord('z') - ord('a') + 1)[tokens]
-
         return tokens
 
