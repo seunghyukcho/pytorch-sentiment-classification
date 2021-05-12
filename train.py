@@ -13,6 +13,17 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import Dataset, PadBatch
 from arguments import get_task_parser, add_train_args
 
+# confusion matrix
+from sklearn.metrics import confusion_matrix
+# f1 score
+from sklearn.metrics import f1_score 
+
+
+# convolution function of confusion matrix --> precisions, accuracy
+def convolution(cm):
+  prec = np.diag(cm/cm.sum(axis=1))
+  acc = np.diag(cm).sum()/np.sum(cm)
+  return prec, acc
 
 if __name__ == "__main__":
     # Read task argument first, and determine the other arguments
@@ -61,7 +72,8 @@ if __name__ == "__main__":
     writer = SummaryWriter(args.log_dir)
     for epoch in range(args.epochs):
         train_loss = 0.0
-        train_correct = 0
+#         train_correct = 0
+        train_cm = np.zeros(shape=(5,5)) # confusion matrix
         model.train()
         for x, y, lens in train_loader:
             model.zero_grad()
@@ -80,34 +92,69 @@ if __name__ == "__main__":
 
             # Calculate classifier accuracy
             pred = torch.argmax(pred, dim=1)
-            train_correct += torch.sum(torch.eq(pred, y)).item()
+#             train_correct += torch.sum(torch.eq(pred, y)).item()
+            train_cm += confusion_matrix(pred, y)
+            
 
         # Validation
         with torch.no_grad():
-            valid_correct = 0
+#             valid_correct = 0
+            valid_cm = np.zeros(shape= (5,5)) # confusion matrix for validation set
+            valid_prec = [0 for _ in range(5)]
             model.eval()
             for x, y, lens in valid_loader:
                 x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
                 pred = model(x, lens)
                 pred = torch.argmax(pred, dim=1)
-                valid_correct += torch.sum(torch.eq(pred, y)).item()
-
+#                 valid_correct += torch.sum(torch.eq(pred, y)).item()
+                valid_cm += confusion_matrix(pred, y)
+        
+        prec_tr, acc_tr = convolution(train_cm)
+        prec_val, acc_val = convolution(valid_cm)
+        
         print(
             f'Epoch: {(epoch + 1):4d} | '
             f'Train Loss: {train_loss:.3f} | '
-            f'Train Accuracy: {(train_correct / len(train_dataset)):.2f} | '
-            f'Valid Accuracy: {(valid_correct / len(valid_dataset)):.2f}'
+            f'Train Accuracy: {acc_tr:.2f} | '
+            f'Train Precisions: {prec_tr[0]:.2f}, {prec_tr[1]:.2f}, {prec_tr[2]:.2f}, {prec_tr[3]:.2f}, {prec_tr[4]:.2f} | '
+            f'Valid Accuracy: {(acc_val / len(valid_dataset)):.2f} | '
+            f'Valid Precisions: {prec_val[0]:.2f}, {prec_val[1]:.2f}, {prec_val[2]:.2f}, {prec_val[3]:.2f}, {prec_val[4]:.2f}'
         )
 
         # Save tensorboard log
         if epoch % args.log_interval == 0:
             writer.add_scalar('train_loss', train_loss, epoch)
-            writer.add_scalar('train_accuracy', train_correct / len(train_dataset), epoch)
-            writer.add_scalar('valid_accuracy', valid_correct / len(valid_dataset), epoch)
+            writer.add_scalar('train_accuracy', acc_tr, epoch)
+            writer.add_scalar('valid_accuracy', acc_val, epoch)
 
         # Save the model with highest accuracy on validation set
-        if best_accuracy < valid_correct:
-            best_accuracy = valid_correct
+        if best_accuracy < acc_val:
+            best_accuracy = acc_val
+            checkpoint_dir = Path(args.save_dir)
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            torch.save({
+                'model': model.state_dict()
+            }, checkpoint_dir / 'best_model.pth')
+
+            with open(checkpoint_dir / 'args.json', 'w') as f:
+                json.dump(args.__dict__, f, indent=2)
+
+            f'Train Loss: {train_loss:.3f} | '
+            f'Train Accuracy: {acc_tr:.2f} | '
+            f'Train Precisions: {prec_tr[0]:.2f}, {prec_tr[1]:.2f}, {prec_tr[2]:.2f}, {prec_tr[3]:.2f}, {prec_tr[4]:.2f} | '
+            f'Valid Accuracy: {(acc_val / len(valid_dataset)):.2f} | '
+            f'Valid Precisions: {prec_val[0]:.2f}, {prec_val[1]:.2f}, {prec_val[2]:.2f}, {prec_val[3]:.2f}, {prec_val[4]:.2f}'
+        )
+
+        # Save tensorboard log
+        if epoch % args.log_interval == 0:
+            writer.add_scalar('train_loss', train_loss, epoch)
+            writer.add_scalar('train_accuracy', acc_tr, epoch)
+            writer.add_scalar('valid_accuracy', acc_val, epoch)
+
+        # Save the model with highest accuracy on validation set
+        if best_accuracy < acc_val:
+            best_accuracy = acc_val
             checkpoint_dir = Path(args.save_dir)
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
             torch.save({
