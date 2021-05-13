@@ -20,8 +20,15 @@ class Model(nn.Module):
         self.n_classes = args.n_classes
         self.embd_dim = args.embd_dim
 
-        self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0)
-        self.rnn = nn.GRU(self.embd_dim, self.n_hids, self.n_layers, batch_first=True)
+        self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0) #학습 가능한 임베딩 테이블 생성
+        #num_embeddings = vocab_size: 임베딩할 단어의 개수, 단어 집합의 크기
+        self.rnn = nn.
+
+
+
+        self.embd_dim, self.n_hids, self.n_layers, batch_first=True)
+
+
         self.decoder = nn.Linear(self.n_hids, self.n_classes)
 
     def forward(self, x, lens):

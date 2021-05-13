@@ -59,9 +59,13 @@ if __name__ == "__main__":
     print('Start training!')
     best_accuracy = 0
     writer = SummaryWriter(args.log_dir)
+
+
+
     for epoch in range(args.epochs):
         train_loss = 0.0
         train_correct = 0
+
         model.train()
         for x, y, lens in train_loader:
             model.zero_grad()
