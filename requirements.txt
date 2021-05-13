@@ -3,3 +3,5 @@ numpy
 tensorboard
 munch
 tqdm
+pandas
+
