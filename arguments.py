@@ -1,6 +1,6 @@
 import argparse
 
-models = ['rnn']
+models = ['rnn', 'transformer']
 tokenizers = ['char', 'word']
 
 
