@@ -18,12 +18,42 @@ from sklearn.metrics import confusion_matrix
 # f1 score
 from sklearn.metrics import f1_score 
 
-
 # convolution function of confusion matrix --> precisions, accuracy
 def convolution(cm):
   prec = np.diag(cm/cm.sum(axis=1))
   acc = np.diag(cm).sum()/np.sum(cm)
   return prec, acc
+
+# cost sensitive loss function
+# adjust misclassification loss 
+# the further prediction and ground truth get, the larger the loss is.
+# cost matrix 'M' is normalized by division by its the max value 4.
+def cost_sensitive_loss(input, target, M):
+    device = input.device
+    M = M.to(device)
+    return (M[target, :]*input.float()).sum(axis=-1)
+
+class CostSensitiveLoss(nn.Module):
+    def __init__(self, exp=1, reduction='mean'):
+        super(CostSensitiveLoss, self).__init__()
+        self.normalization = nn.Softmax(dim=1)
+        self.reduction = reduction
+        x = np.abs(np.arange(5, dtype=np.float32))
+        M = np.abs((x[:, np.newaxis] - x[np.newaxis, :])) ** exp
+        M /= M.max()
+        self.M = torch.from_numpy(M)
+
+    def forward(self, probs, target):
+        preds = self.normalization(probs)
+        loss = cost_sensitive_loss(preds, target, self.M)
+        if self.reduction == 'none':
+            return loss
+        elif self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            raise ValueError('\'reduction\' should be among mean, sum, none.')
 
 if __name__ == "__main__":
     # Read task argument first, and determine the other arguments
@@ -64,7 +94,7 @@ if __name__ == "__main__":
     model = model.to(args.device)
 
     # Ignore annotators labeling which is -1
-    criterion = nn.CrossEntropyLoss(reduction='mean')
+    criterion = CostSensitiveLoss(exp=1, reduction='mean')
     optimizer = Adam(model.parameters(), lr=args.lr)
 
     print('Start training!')
