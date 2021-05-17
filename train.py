@@ -13,6 +13,10 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import Dataset, PadBatch
 from arguments import get_task_parser, add_train_args
 
+# stratified split
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedKFold
+
 # confusion matrix
 from sklearn.metrics import confusion_matrix
 # f1 score
@@ -21,8 +25,8 @@ from sklearn.metrics import f1_score
 # convolution function of confusion matrix --> precisions, accuracy
 def convolution(cm):
   eps = 1e-6
-#   prec = np.diag((cm+eps)/(cm.sum(axis=1)+eps))
-  prec = np.diag(cm/cm.sum(axis=1))
+  prec = np.diag((cm)/(cm.sum(axis=1)+eps))
+#   prec = np.diag(cm/cm.sum(axis=1))
   acc = np.diag(cm).sum()/np.sum(cm)
   return prec, acc
 
@@ -56,7 +60,69 @@ class CostSensitiveLoss(nn.Module):
             return loss.sum()
         else:
             raise ValueError('\'reduction\' should be among mean, sum, none.')
+            
+# class Sampler(object):
+#     """Base class for all Samplers.
+#     Every Sampler subclass has to provide an __iter__ method, providing a way
+#     to iterate over indices of dataset elements, and a __len__ method that
+#     returns the length of the returned iterators.
+#     """
 
+#     def __init__(self, data_source):
+#         pass
+
+#     def __iter__(self):
+#         raise NotImplementedError
+
+#     def __len__(self):
+#         raise NotImplementedError
+            
+# class StratifiedSampler(Sampler):
+#     """Stratified Sampling
+#     Provides equal representation of target classes in each batch
+#     """
+#     def __init__(self, class_vector, batch_size):
+#         self.n_splits = int(class_vector.size(0) / batch_size)
+#         self.class_vector = class_vector
+
+#     def gen_sample_array(self):        
+#         s = StratifiedShuffleSplit(n_splits=self.n_splits, test_size=0.5)
+#         X = torch.randn(self.class_vector.size(0),2).numpy()
+#         y = self.class_vector.numpy()
+#         s.get_n_splits(X, y)
+
+#         train_index, test_index = next(s.split(X, y))
+#         return np.hstack([train_index, test_index])
+
+#     def __iter__(self):
+#         return iter(self.gen_sample_array())
+
+#     def __len__(self):
+#         return len(self.class_vector)
+
+class StratifiedBatchSampler:
+    """Stratified batch sampling
+    Provides equal representation of target classes in each batch
+    """
+    def __init__(self, y, batch_size, shuffle=True):
+        if torch.is_tensor(y):
+            y = y.numpy()
+        assert len(y.shape) == 1, 'label array must be 1D'
+        n_batches = int(len(y) / batch_size)
+        self.skf = StratifiedKFold(n_splits=n_batches, shuffle=shuffle)
+        self.X = torch.randn(len(y),1).numpy()
+        self.y = y
+        self.shuffle = shuffle
+
+    def __iter__(self):
+        if self.shuffle:
+            self.skf.random_state = torch.randint(0,int(1e8),size=()).item()
+        for train_idx, test_idx in self.skf.split(self.X, self.y):
+            yield test_idx
+
+    def __len__(self):
+        return len(self.y)
+                    
 if __name__ == "__main__":
     # Read task argument first, and determine the other arguments
     task_parser = get_task_parser()
@@ -85,18 +151,22 @@ if __name__ == "__main__":
 
     print('Loading train dataset...')
     train_dataset = Dataset(args.train_data, tokenizer=tokenizer, label=True)
+    y = torch.from_numpy(train_dataset.data.loc[:,'Category'].values)
+    sampler = StratifiedBatchSampler(y, args.batch_size)
+    # train_loader = DataLoader(dataset=train_dataset, collate_fn=PadBatch(), batch_sampler= sampler)
     train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=PadBatch())
 
     print('Loading validation dataset...')
     valid_dataset = Dataset(args.valid_data, tokenizer=tokenizer, label=True)
     valid_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, collate_fn=PadBatch())
-
+    
     print('Building model...')
     model = model(args, vocab_size=tokenizer.get_vocab_size() + 1)
     model = model.to(args.device)
 
     # Ignore annotators labeling which is -1
     criterion = CostSensitiveLoss(exp=1, reduction='mean')
+    # criterion = nn.CrossEntropyLoss(reduction='mean')
     optimizer = Adam(model.parameters(), lr=args.lr)
 
     print('Start training!')
@@ -125,21 +195,20 @@ if __name__ == "__main__":
             # Calculate classifier accuracy
             pred = torch.argmax(pred, dim=1)
 #             train_correct += torch.sum(torch.eq(pred, y)).item()
-            train_cm += confusion_matrix(pred.cpu().numpy(), y.cpu().numpy(),labels=[0,1,2,3,4])
+            train_cm += confusion_matrix( y.cpu().numpy(),pred.cpu().numpy(),labels=[0,1,2,3,4])
             
 
         # Validation
         with torch.no_grad():
 #             valid_correct = 0
             valid_cm = np.zeros(shape= (5,5)) # confusion matrix for validation set
-            valid_prec = [0 for _ in range(5)]
             model.eval()
             for x, y, lens in valid_loader:
                 x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
                 pred = model(x, lens)
                 pred = torch.argmax(pred, dim=1)
 #                 valid_correct += torch.sum(torch.eq(pred, y)).item()
-                valid_cm += confusion_matrix(pred.cpu().numpy(), y.cpu().numpy(), labels=[0,1,2,3,4])
+                valid_cm += confusion_matrix( y.cpu().numpy(), pred.cpu().numpy(), labels=[0,1,2,3,4])
         
         prec_tr, acc_tr = convolution(train_cm)
         prec_val, acc_val = convolution(valid_cm)
@@ -152,7 +221,11 @@ if __name__ == "__main__":
             f'Valid Accuracy: {(acc_val / len(valid_dataset)):.2f} | '
             f'Valid Precisions: {prec_val[0]:.2f}, {prec_val[1]:.2f}, {prec_val[2]:.2f}, {prec_val[3]:.2f}, {prec_val[4]:.2f}'
         )
-
+        print('Train confusion matrix')
+        print(train_cm)
+        print()
+        print('validation confusion matrix')
+        print(valid_cm)
         # Save tensorboard log
         if epoch % args.log_interval == 0:
             writer.add_scalar('train_loss', train_loss, epoch)
