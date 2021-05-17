@@ -20,6 +20,8 @@ from sklearn.metrics import f1_score
 
 # convolution function of confusion matrix --> precisions, accuracy
 def convolution(cm):
+  eps = 1e-6
+#   prec = np.diag((cm+eps)/(cm.sum(axis=1)+eps))
   prec = np.diag(cm/cm.sum(axis=1))
   acc = np.diag(cm).sum()/np.sum(cm)
   return prec, acc
@@ -123,7 +125,7 @@ if __name__ == "__main__":
             # Calculate classifier accuracy
             pred = torch.argmax(pred, dim=1)
 #             train_correct += torch.sum(torch.eq(pred, y)).item()
-            train_cm += confusion_matrix(pred, y)
+            train_cm += confusion_matrix(pred.cpu().numpy(), y.cpu().numpy(),labels=[0,1,2,3,4])
             
 
         # Validation
@@ -137,7 +139,7 @@ if __name__ == "__main__":
                 pred = model(x, lens)
                 pred = torch.argmax(pred, dim=1)
 #                 valid_correct += torch.sum(torch.eq(pred, y)).item()
-                valid_cm += confusion_matrix(pred, y)
+                valid_cm += confusion_matrix(pred.cpu().numpy(), y.cpu().numpy(), labels=[0,1,2,3,4])
         
         prec_tr, acc_tr = convolution(train_cm)
         prec_val, acc_val = convolution(valid_cm)
@@ -156,25 +158,6 @@ if __name__ == "__main__":
             writer.add_scalar('train_loss', train_loss, epoch)
             writer.add_scalar('train_accuracy', acc_tr, epoch)
             writer.add_scalar('valid_accuracy', acc_val, epoch)
-
-        # Save the model with highest accuracy on validation set
-        if best_accuracy < acc_val:
-            best_accuracy = acc_val
-            checkpoint_dir = Path(args.save_dir)
-            checkpoint_dir.mkdir(parents=True, exist_ok=True)
-            torch.save({
-                'model': model.state_dict()
-            }, checkpoint_dir / 'best_model.pth')
-
-            with open(checkpoint_dir / 'args.json', 'w') as f:
-                json.dump(args.__dict__, f, indent=2)
-
-            f'Train Loss: {train_loss:.3f} | '
-            f'Train Accuracy: {acc_tr:.2f} | '
-            f'Train Precisions: {prec_tr[0]:.2f}, {prec_tr[1]:.2f}, {prec_tr[2]:.2f}, {prec_tr[3]:.2f}, {prec_tr[4]:.2f} | '
-            f'Valid Accuracy: {(acc_val / len(valid_dataset)):.2f} | '
-            f'Valid Precisions: {prec_val[0]:.2f}, {prec_val[1]:.2f}, {prec_val[2]:.2f}, {prec_val[3]:.2f}, {prec_val[4]:.2f}'
-        )
 
         # Save tensorboard log
         if epoch % args.log_interval == 0:
