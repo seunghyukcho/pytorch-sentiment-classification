@@ -218,14 +218,16 @@ if __name__ == "__main__":
             f'Train Loss: {train_loss:.3f} | '
             f'Train Accuracy: {acc_tr:.2f} | '
             f'Train Precisions: {prec_tr[0]:.2f}, {prec_tr[1]:.2f}, {prec_tr[2]:.2f}, {prec_tr[3]:.2f}, {prec_tr[4]:.2f} | '
-            f'Valid Accuracy: {(acc_val / len(valid_dataset)):.2f} | '
+            f'Valid Accuracy: {acc_val:.2f} | '
             f'Valid Precisions: {prec_val[0]:.2f}, {prec_val[1]:.2f}, {prec_val[2]:.2f}, {prec_val[3]:.2f}, {prec_val[4]:.2f}'
         )
+        print()
         print('Train confusion matrix')
         print(train_cm)
         print()
         print('validation confusion matrix')
         print(valid_cm)
+        print('-------------------\n')
         # Save tensorboard log
         if epoch % args.log_interval == 0:
             writer.add_scalar('train_loss', train_loss, epoch)
