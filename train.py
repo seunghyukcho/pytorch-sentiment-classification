@@ -19,16 +19,15 @@ from sklearn.model_selection import StratifiedKFold
 
 # confusion matrix
 from sklearn.metrics import confusion_matrix
-# f1 score
-from sklearn.metrics import f1_score 
 
 # convolution function of confusion matrix --> precisions, accuracy
 def convolution(cm):
   eps = 1e-6
-  prec = np.diag((cm)/(cm.sum(axis=1)+eps))
+  rec = np.diag(cm)/(cm.sum(axis=1)+eps)
+  prec = np.diag(cm)/(cm.sum(axis=0)+eps)
 #   prec = np.diag(cm/cm.sum(axis=1))
   acc = np.diag(cm).sum()/np.sum(cm)
-  return prec, acc
+  return prec, rec ,acc
 
 # cost sensitive loss function
 # adjust misclassification loss 
@@ -44,9 +43,18 @@ class CostSensitiveLoss(nn.Module):
         super(CostSensitiveLoss, self).__init__()
         self.normalization = nn.Softmax(dim=1)
         self.reduction = reduction
-        x = np.abs(np.arange(5, dtype=np.float32))
-        M = np.abs((x[:, np.newaxis] - x[np.newaxis, :])) ** exp
-        M /= M.max()
+        # x = np.abs(np.arange(5, dtype=np.float32))
+        # M = np.abs((x[:, np.newaxis] - x[np.newaxis, :])) ** exp
+        # M /= M.max()
+
+        M = np.array(
+          [[0,1,1,1,1.1],
+            [1,0,1,1,1.1],
+            [1.1,1,0,1,1.1],
+            [1.1,1,1,0,1],
+            [1.1,1,1,1,0]]
+        )
+        M = M/M.max()
         self.M = torch.from_numpy(M)
 
     def forward(self, probs, target):
@@ -60,45 +68,6 @@ class CostSensitiveLoss(nn.Module):
             return loss.sum()
         else:
             raise ValueError('\'reduction\' should be among mean, sum, none.')
-            
-# class Sampler(object):
-#     """Base class for all Samplers.
-#     Every Sampler subclass has to provide an __iter__ method, providing a way
-#     to iterate over indices of dataset elements, and a __len__ method that
-#     returns the length of the returned iterators.
-#     """
-
-#     def __init__(self, data_source):
-#         pass
-
-#     def __iter__(self):
-#         raise NotImplementedError
-
-#     def __len__(self):
-#         raise NotImplementedError
-            
-# class StratifiedSampler(Sampler):
-#     """Stratified Sampling
-#     Provides equal representation of target classes in each batch
-#     """
-#     def __init__(self, class_vector, batch_size):
-#         self.n_splits = int(class_vector.size(0) / batch_size)
-#         self.class_vector = class_vector
-
-#     def gen_sample_array(self):        
-#         s = StratifiedShuffleSplit(n_splits=self.n_splits, test_size=0.5)
-#         X = torch.randn(self.class_vector.size(0),2).numpy()
-#         y = self.class_vector.numpy()
-#         s.get_n_splits(X, y)
-
-#         train_index, test_index = next(s.split(X, y))
-#         return np.hstack([train_index, test_index])
-
-#     def __iter__(self):
-#         return iter(self.gen_sample_array())
-
-#     def __len__(self):
-#         return len(self.class_vector)
 
 class StratifiedBatchSampler:
     """Stratified batch sampling
@@ -174,7 +143,7 @@ if __name__ == "__main__":
     writer = SummaryWriter(args.log_dir)
     for epoch in range(args.epochs):
         train_loss = 0.0
-#         train_correct = 0
+        train_correct = 0
         train_cm = np.zeros(shape=(5,5)) # confusion matrix
         model.train()
         for x, y, lens in train_loader:
@@ -194,32 +163,30 @@ if __name__ == "__main__":
 
             # Calculate classifier accuracy
             pred = torch.argmax(pred, dim=1)
-#             train_correct += torch.sum(torch.eq(pred, y)).item()
+            train_correct += torch.sum(torch.eq(pred, y)).item()
             train_cm += confusion_matrix( y.cpu().numpy(),pred.cpu().numpy(),labels=[0,1,2,3,4])
             
 
         # Validation
         with torch.no_grad():
-#             valid_correct = 0
+            valid_correct = 0
             valid_cm = np.zeros(shape= (5,5)) # confusion matrix for validation set
             model.eval()
             for x, y, lens in valid_loader:
                 x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
                 pred = model(x, lens)
                 pred = torch.argmax(pred, dim=1)
-#                 valid_correct += torch.sum(torch.eq(pred, y)).item()
+                valid_correct += torch.sum(torch.eq(pred, y)).item()
                 valid_cm += confusion_matrix( y.cpu().numpy(), pred.cpu().numpy(), labels=[0,1,2,3,4])
         
-        prec_tr, acc_tr = convolution(train_cm)
-        prec_val, acc_val = convolution(valid_cm)
+        prec_tr, rec_tr, acc_tr = convolution(train_cm)
+        prec_val, rec_val, acc_val = convolution(valid_cm)
         
         print(
             f'Epoch: {(epoch + 1):4d} | '
             f'Train Loss: {train_loss:.3f} | '
-            f'Train Accuracy: {acc_tr:.2f} | '
-            f'Train Precisions: {prec_tr[0]:.2f}, {prec_tr[1]:.2f}, {prec_tr[2]:.2f}, {prec_tr[3]:.2f}, {prec_tr[4]:.2f} | '
-            f'Valid Accuracy: {acc_val:.2f} | '
-            f'Valid Precisions: {prec_val[0]:.2f}, {prec_val[1]:.2f}, {prec_val[2]:.2f}, {prec_val[3]:.2f}, {prec_val[4]:.2f}'
+            f'Train Accuracy: {(train_correct / len(train_dataset)):.2f} | '
+            f'Valid Accuracy: {(valid_correct / len(valid_dataset)):.2f}'
         )
         print()
         print('Train confusion matrix')
