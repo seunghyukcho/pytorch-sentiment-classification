@@ -13,8 +13,8 @@ class Tokenizer():
     def get_vocab_size(self):
         return len(self.dict) + 1
 
-    def tokenize(self, sentence):
-        tokens = []
+    def tokenize(self, sentence,k=1):
+        tokens = [len(self.dict)+1]*(k-1) # token padding
         for word in sentence.split():
             tokens.append(self.dict.get(word, len(self.dict)))
         return tokens
