@@ -134,8 +134,8 @@ if __name__ == "__main__":
     model = model.to(args.device)
 
     # Ignore annotators labeling which is -1
-    criterion = CostSensitiveLoss(exp=1, reduction='mean')
-    # criterion = nn.CrossEntropyLoss(reduction='mean')
+#     criterion = CostSensitiveLoss(exp=1, reduction='mean')
+    criterion = nn.CrossEntropyLoss(reduction='mean')
     optimizer = Adam(model.parameters(), lr=args.lr)
 
     print('Start training!')
