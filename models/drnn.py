@@ -49,7 +49,7 @@ class Model(nn.Module):
         h = torch.tensor([],device= x.device)
         
         for i in range(seq_len):
-            h_t, _ = self.rnn(x[:,i:i+self.k]) # output from last layer, the others.
+            h_t, _ = self.rnn(x[:,i:i+self.k,:]) # output from last layer, the others.
             h_t = self.drop(h_t)
             h_t = self.mlp(h_t)
             h= h.cat((h,h_t),dim= 1)
