@@ -9,8 +9,9 @@ def add_model_args(parser):
             help='Number of layers')
     group.add_argument('--embd_dim', type=int, default=1,
             help='Embedding dimension')
-
-
+    group.add_argument('--k', type=int, default=1,
+            help='window size')
+    
 class Model(nn.Module):
     def __init__(self, args, vocab_size, k):
         super().__init__()
@@ -19,7 +20,7 @@ class Model(nn.Module):
         self.n_layers = args.n_layers
         self.n_classes = args.n_classes
         self.embd_dim = args.embd_dim
-        self.k = k # window size # todo: take it as an 'model argument'.
+        self.k = args.k 
 
         self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0)
         self.rnn = nn.GRU(self.embd_dim, self.n_hids, self.n_layers, batch_first=True, dropout= 0.1)
