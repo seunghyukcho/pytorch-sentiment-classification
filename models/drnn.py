@@ -30,7 +30,7 @@ class Model(nn.Module):
                 nn.Linear(self.n_hids, self.n_hids),
                 nn.ReLU()
             )
-        self.maxpool = nn.AdaptiveMaxPool1d(self.n_hids)
+#         self.maxpool = nn.AdaptiveMaxPool1d(self.n_hids)
 
         self.decoder = nn.Sequential(
             nn.Linear(self.n_hids, self.n_hids)
@@ -57,12 +57,9 @@ class Model(nn.Module):
         # Max Pool
         # todo.
         h_reshape = torch.reshape(h,(-1,seq_len,self.n_hids))
-        h_reshape = torch.unsqueeze(h_reshape, -1) # to apply maxpool1d
-        pooled=torch.nn.functional.max_pool(
-            h_reshape,
-            kernal_size=[1,seq_len,1,1],
-            strides=[1,1,1,1],padding=0
-            )
+#         h_reshape = torch.unsqueeze(h_reshape, -1) # to apply maxpool1d
+        maxpool= nn.MaxPool2d(kernel_size= (seq_len,1),stride=(1,1))
+        pooled= maxpool(h_reshape)
         pooled = torch.reshape(pooled, (-1,self.n_hids))
 
         # decoder
