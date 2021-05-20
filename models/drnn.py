@@ -13,7 +13,7 @@ def add_model_args(parser):
             help='window size')
     
 class Model(nn.Module):
-    def __init__(self, args, vocab_size, k):
+    def __init__(self, args, vocab_size):
         super().__init__()
 
         self.n_hids = args.n_hids
