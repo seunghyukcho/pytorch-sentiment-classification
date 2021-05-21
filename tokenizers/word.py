@@ -14,7 +14,7 @@ class Tokenizer():
         return len(self.dict) + 1
 
     def tokenize(self, sentence,k=1):
-        tokens = [len(self.dict)+1]*(k-1) # token padding
+        tokens = []
         for word in sentence.split():
             tokens.append(self.dict.get(word, len(self.dict)))
         return tokens
