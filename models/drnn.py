@@ -23,26 +23,29 @@ class Model(nn.Module):
         self.k = args.k 
 
         self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0)
-        self.rnn = nn.GRU(self.embd_dim, self.n_hids, self.n_layers, batch_first=True, dropout= 0.1)
-        self.drop = nn.Dropout(p=0.05)
+        self.rnn = nn.GRU(self.embd_dim, self.n_hids, self.n_layers, batch_first=True, dropout= 0.2)
+        self.drop = nn.Dropout(p=0.2)
         self.mlp = nn.Sequential(
-                nn.BatchNorm1d(self.k),
+                # nn.BatchNorm1d(self.k),
                 nn.Linear(self.n_hids, self.n_hids),
                 nn.ReLU()
             )
 #         self.maxpool = nn.AdaptiveMaxPool1d(self.n_hids)
 
         self.decoder = nn.Sequential(
-            nn.Linear(self.k, self.n_hids),
+            nn.Linear(self.k, self.k),
             nn.ReLU(),
-            nn.Linear(self.n_hids, self.n_classes)
+            nn.Linear(self.k, self.n_classes)
         )
 
     def forward(self, x, lens):
         # lens: list(a length of every sentence)
         self.rnn.flatten_parameters()
+        # print(x.shape)
+        zeros = torch.zeros((x.shape[0],self.k),device=x.device,dtype=torch.long)
+        x = torch.cat((zeros,x),dim=1)
         x = self.embd(x)
-        
+
         # DGRU and MLP
         n_tokens = x.shape[1] # including paddings.(# = k-1)
         seq_len = n_tokens-self.k
@@ -57,7 +60,7 @@ class Model(nn.Module):
             # print(f'n_hids: {self.n_hids}')
             # print(f'hidden vector\'s dimension: {h_t.shape}') # batch, k(window size), n_hids
             # print(f'{},{},{}')
-            h_t = self.drop(h_t)
+            # h_t = self.drop(h_t)
             h_t = self.mlp(h_t)
             h= torch.cat((h,h_t),dim= 1)
             
