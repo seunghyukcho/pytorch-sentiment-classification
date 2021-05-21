@@ -9,7 +9,7 @@ def add_model_args(parser):
             help='Number of layers')
     group.add_argument('--embd_dim', type=int, default=1,
             help='Embedding dimension')
-    group.add_argument('--k', type=int, default=1,
+    group.add_argument('--k', type=int, default=15,
             help='window size')
     
 class Model(nn.Module):
