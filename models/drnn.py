@@ -24,19 +24,21 @@ class Model(nn.Module):
 
         self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0)
         self.rnn = nn.GRU(self.embd_dim, self.n_hids, self.n_layers, batch_first=True, dropout= 0.2)
-        self.drop = nn.Dropout(p=0.2)
+        # self.drop = nn.Dropout(p=0.2)
         self.mlp = nn.Sequential(
                 # nn.BatchNorm1d(self.k),
                 nn.Linear(self.n_hids, self.n_hids),
+                nn.Dropout(p=0.5),
                 nn.ReLU()
             )
-#         self.maxpool = nn.AdaptiveMaxPool1d(self.n_hids)
 
         self.decoder = nn.Sequential(
-            nn.Linear(self.k, self.k),
-            nn.ReLU(),
+            # nn.Linear(self.k, self.k),
+            # nn.ReLU(),
             nn.Linear(self.k, self.n_classes)
         )
+
+
 
     def forward(self, x, lens):
         # lens: list(a length of every sentence)
@@ -62,26 +64,15 @@ class Model(nn.Module):
             # print(f'{},{},{}')
             # h_t = self.drop(h_t)
             h_t = self.mlp(h_t)
-            h= torch.cat((h,h_t),dim= 1)
-            
-        # Max Pool
+            h= torch.cat((h,h_t),dim= 1)          
+        
         # todo.
-        bs= h.shape[0]
+        bs= h.shape[0] # h: batch, k, seq_len * n_hids
         h_reshape = torch.reshape(h,(bs,-1,seq_len,self.n_hids))
 #         h_reshape = torch.unsqueeze(h_reshape, -1) # to apply maxpool1d
-        maxpool= nn.MaxPool2d(kernel_size= (seq_len,1),stride=(1,1))
+        maxpool= nn.MaxPool2d(kernel_size= (seq_len,self.n_hids),stride=(1,1))
         pooled= maxpool(h_reshape)
-        pooled = torch.reshape(pooled, (bs,-1,self.n_hids))
-        # print(f'pooled size: {pooled.shape}')
-        maxpool1d = nn.MaxPool1d(self.n_hids)
-        pooled = maxpool1d(pooled).squeeze()
-        # print(f'pooled size: {pooled.shape}')
-        # lens = lens.unsqueeze(-1).repeat(1, self.n_hids).unsqueeze(1) - 1
-        # print('lens', lens.shape)
-        # h = h.gather(1, lens)
-        # print('after gather ', h.shape)
-        # h = h.squeeze(1)
-        # print('after squeeze ',h.shape)
+        pooled = pooled.squeeze() # batch, k
 
         # decoder
         # pooled: (batch, N, n_hids)
