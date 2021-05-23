@@ -1,4 +1,4 @@
-  def add_tokenizer_args(parser):
+def add_tokenizer_args(parser):
     group = parser.add_argument_group('tokenizer')
     group.add_argument('--dict', type=str, 
             help='Path to dictionary file')
