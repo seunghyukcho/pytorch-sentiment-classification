@@ -35,7 +35,7 @@ class Model(nn.Module):
         self.decoder = nn.Sequential(
             # nn.Linear(self.k, self.k),
             # nn.ReLU(),
-            nn.Linear(self.k, self.n_classes)
+            nn.Linear(self.n_hids, self.n_classes)
         )
 
 
@@ -57,22 +57,26 @@ class Model(nn.Module):
 
             # print(x[:,i:i+self.k,:].shape)
             h_t, _ = self.rnn(x[:,i:i+self.k,:]) # output from last layer, the others.
+            # h_t: (B, self.k, self.embd_dim)
             # print(f'seq_len: {seq_len}')
             # print(f'self.k: {self.k}')
             # print(f'n_hids: {self.n_hids}')
             # print(f'hidden vector\'s dimension: {h_t.shape}') # batch, k(window size), n_hids
             # print(f'{},{},{}')
             # h_t = self.drop(h_t)
-            h_t = self.mlp(h_t)
+            h_t = h_t[:,-1,:] # (B, self.n_hids)
+            h_t = self.mlp(h_t) # (B, self.n_hids)
             h= torch.cat((h,h_t),dim= 1)          
         
         # todo.
-        bs= h.shape[0] # h: batch, k, seq_len * n_hids
-        h_reshape = torch.reshape(h,(bs,-1,seq_len,self.n_hids))
+        bs= h.shape[0] # h: batch, 1, seq_len * n_hids
+        h_reshape = torch.reshape(h,(bs,seq_len,self.n_hids))
 #         h_reshape = torch.unsqueeze(h_reshape, -1) # to apply maxpool1d
-        maxpool= nn.MaxPool2d(kernel_size= (seq_len,self.n_hids),stride=(1,1))
-        pooled= maxpool(h_reshape)
-        pooled = pooled.squeeze() # batch, k
+        # maxpool= nn.MaxPool2d(kernel_size= (seq_len,self.n_hids),stride=(1,1))
+        maxpool= nn.MaxPool1d(kernel_size= seq_len)
+        pooled= maxpool(torch.transpose(h_reshape,1,2))
+        pooled = pooled.squeeze() # batch, self.n_hids
+        # print(f'pooled\'s shape = {pooled.shape}')
 
         # decoder
         # pooled: (batch, N, n_hids)
