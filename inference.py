@@ -35,15 +35,17 @@ if __name__ == "__main__":
     test_dataset = Dataset(args.test_data, tokenizer=tokenizer)
     test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=PadBatch(inference=True))
 
-    model = getattr(model_module, 'Model')(config, vocab_size=tokenizer.get_vocab_size() + 1)
+    model = getattr(model_module, 'Model')(config, vocab_size=tokenizer.get_vocab_size() + 1, sentence_size= tokenizer.get_sentence_size() + 1)
     model.load_state_dict(ckpt['model'])
     model = model.to(args.device)
 
     with torch.no_grad():
         preds = torch.empty(0).to(args.device)
         model.eval()
-        for x, lens in tqdm(test_loader):
-            x, lens = x.to(args.device), lens.to(args.device)
+        for w, s, lw, ls in tqdm(test_loader):
+            w, s, lw, ls = w.to(args.device), s.to(args.device), lw.to(args.device), ls.to(args.device)
+            
+            # todo
             pred = model(x, lens)
             pred = torch.argmax(pred, dim=1)
             preds = torch.cat([preds, pred], dim=0)
