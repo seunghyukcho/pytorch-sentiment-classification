@@ -46,7 +46,7 @@ if __name__ == "__main__":
             w, s, lw, ls = w.to(args.device), s.to(args.device), lw.to(args.device), ls.to(args.device)
             
             # todo
-            pred = model(x, lens)
+            pred = model(w, s, lw, ls, False)
             pred = torch.argmax(pred, dim=1)
             preds = torch.cat([preds, pred], dim=0)
         
