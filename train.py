@@ -42,7 +42,7 @@ class StratifiedBatchSampler:
 
     def __len__(self):
         return len(self.y)
-                    
+
 if __name__ == "__main__":
     # Read task argument first, and determine the other arguments
     task_parser = get_task_parser()
@@ -88,6 +88,19 @@ if __name__ == "__main__":
     # Ignore annotators labeling which is -1
     criterion = nn.CrossEntropyLoss(reduction='mean')
     optimizer = Adam(model.parameters(), lr=args.lr)
+    eye = torch.eye(model.k, device= args.device)
+    def R(T,eye):
+        T_norm = torch.norm(T, p=2, dim=1)
+        return torch.norm((T_norm.view(-1,1)@T_norm.view(1,-1)-eye)**2,p=1)  
+    
+    CosSim = nn.CosineSimilarity(dim=1, eps=1e-7)
+    def U(t_s, c_s):
+        # t_s: (batch, self.embd_dim)
+        # c_s: (batch, self.embd_dim)
+        sim = CosSim(t_s, c_s)
+        sim[sim<=1e-7] = 1e-7 
+        return -torch.log(sim).sum()
+
 
     print('Start training!')
     best_accuracy = 0
@@ -103,10 +116,10 @@ if __name__ == "__main__":
             # Move the parameters to device given by argument
             # todo
             w, s, lw, ls, y = w.to(args.device), s.to(args.device), lw.to(args.device), ls.to(args.device), y.to(args.device)
-            pred = model(x, lens)
+            pred, T, t_s, c_s = model(w, s, lw, ls, True)
 
             # Calculate loss of annotators' labeling
-            loss = criterion(pred, y.view(-1))
+            loss = criterion(pred, y.view(-1)) + 0.1*R(T,eye) + 1.0*U(t_s, c_s)
 
             # Update model weight using gradient descent
             loss.backward()
@@ -127,7 +140,7 @@ if __name__ == "__main__":
             for x, y, lens in valid_loader:
                 w, s, lw, ls, y = w.to(args.device), s.to(args.device), lw.to(args.device), ls.to(args.device), y.to(args.device)
                 # todo
-                pred = model(x, lens)
+                pred = model(w, s, lw, ls, False)
                 pred = torch.argmax(pred, dim=1)
                 valid_correct += torch.sum(torch.eq(pred, y)).item()
                 valid_cm += confusion_matrix( y.cpu().numpy(), pred.cpu().numpy(), labels=[0,1,2,3,4])
