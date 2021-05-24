@@ -16,11 +16,11 @@ class Dataset(data.Dataset):
 
     def __getitem__(self, idx):
         x = self.data['Sentence'].iloc[idx]
-        x = self.tokenizer.tokenize(x)
+        word, sentence = self.tokenizer.tokenize(x)
         if self.label:
-            return x, self.data['Category'].iloc[idx]
+            return word, sentence, self.data['Category'].iloc[idx]
         else:
-            return x
+            return word, sentence
 
 
 class PadBatch:
@@ -29,18 +29,22 @@ class PadBatch:
         self.inference = inference
 
     def __call__(self, batch):
-        sentences, lens = [], []
+        words, sentences, lens = [], [], []
         if self.inference:
-            for item in batch:
-                sentences.append(torch.LongTensor(item))
-                lens.append(len(item))
-            return pad_sequence(sentences, batch_first=True), torch.LongTensor(lens)
+            for word, sentence in batch:
+                words.append(torch.LongTensor(word))
+                sentences.append(torch.LongTensor(sentence))
+                lens_word.append(len(word))
+                lens_sentence.append(len(sentence))
+            return pad_sequence(words, batch_first=True), pad_sequence(sentences, batch_first=True), torch.LongTensor(lens_word), torch.LongTensor(lens_sentence)
         else:
             labels = []
             for item in batch:
-                x, y = item
-                sentences.append(torch.LongTensor(x))
-                lens.append(len(x))
+                word, sentence, y = item
+                words.append(torch.LongTensor(word))
+                sentences.append(torch.LongTensor(sentences))
+                lens_word.append(len(word))
+                lens_sentence.append(len(sentence))
                 labels.append(y)
-            return pad_sequence(sentences, batch_first=True), torch.LongTensor(labels), torch.LongTensor(lens)
+            return pad_sequence(words, batch_first=True), pad_sequence(sentences, batch_first=True), torch.LongTensor(lens_word), torch.LongTensor(lens_sentence), torch.LongTensor(labels)
 
