@@ -35,8 +35,12 @@ class Model(nn.Module):
         self.Wt = nn.Linear(self.embd_dim, self.k)
         self.softmax = nn.Softmax(dim=1)
         self.T = nn.Parameter(torch.randn((self.k,self.emb_dim), requires_grad=True))
-
+        self.Wa = nn.Parameter(torch.randn((self.emb_dim,self.emb_dim), requires_grad=True))
+        self.tanh = nn.Tanh()
+        
+        # decoder
         self.decoder = nn.Linear(self.n_hids, self.n_classes)
+
 
     def forward(self, w, s, lw, ls):
         self.rnn.flatten_parameters()
@@ -47,16 +51,16 @@ class Model(nn.Module):
         h,_ = self.rnn(w) # h: (batch, n, self.n_hids)
         # 2) sentence --> Auto encoder
         w, s = torch.mean(w, dim=1), torch.mean(s, dim=1) # w, s: (batch, self.embd_dim)
-        cs = (w+s)/2.0 # AVERAGE, captures both target information and context information.
-        qt = self.softmax(self.Wt(cs))
-        ts = self.T.T@
+        c_s = (w+s)/2.0 # AVERAGE, captures both target information and context information.
+        q_t = self.softmax(self.Wt(cs)) # (batch, self.k)
+        t_s = (self.T.T@q_t.unsqueeze(-1)).squeeze() # (batch, self.embd_dim)
         
-        
-        # x = self.embd(x)
-        # x, _ = self.rnn(x)
-        # lens = lens.unsqueeze(-1).repeat(1, self.n_hids).unsqueeze(1) - 1
-        # x = x.gather(1, lens)
-        # x = x.squeeze(1)
-        # x = self.decoder(x)
+        # todo : d correction. 
+        d = self.tanh((h@self.Wa@t_s))  # (batch,n,self.embd_dim) (self.embd_dim, self.embd_dim) (batch, self.embd_dim) != (batch, n, 1)
+        p = self.softmax(d) # (batch, n, 1)
+
+        # obtain sentence representation
+        z_s = torch.sum(p*h, dim=1) # (batch, self.embd_dim)
+        output = self.decoder(z_s)
 
         return x
