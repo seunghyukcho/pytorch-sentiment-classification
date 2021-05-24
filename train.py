@@ -20,55 +20,6 @@ from sklearn.model_selection import StratifiedKFold
 # confusion matrix
 from sklearn.metrics import confusion_matrix
 
-# convolution function of confusion matrix --> precisions, accuracy
-def convolution(cm):
-  eps = 1e-6
-  rec = np.diag(cm)/(cm.sum(axis=1)+eps)
-  prec = np.diag(cm)/(cm.sum(axis=0)+eps)
-#   prec = np.diag(cm/cm.sum(axis=1))
-  acc = np.diag(cm).sum()/np.sum(cm)
-  return prec, rec ,acc
-
-# cost sensitive loss function
-# adjust misclassification loss 
-# the further prediction and ground truth get, the larger the loss is.
-# cost matrix 'M' is normalized by division by its the max value 4.
-def cost_sensitive_loss(input, target, M):
-    device = input.device
-    M = M.to(device)
-    return (M[target, :]*input.float()).sum(axis=-1)
-
-class CostSensitiveLoss(nn.Module):
-    def __init__(self, exp=1, reduction='mean'):
-        super(CostSensitiveLoss, self).__init__()
-        self.normalization = nn.Softmax(dim=1)
-        self.reduction = reduction
-        # x = np.abs(np.arange(5, dtype=np.float32))
-        # M = np.abs((x[:, np.newaxis] - x[np.newaxis, :])) ** exp
-        # M /= M.max()
-
-        M = np.array(
-          [[0,1,1,1,1.1],
-            [1,0,1,1,1.1],
-            [1.1,1,0,1,1.1],
-            [1.1,1,1,0,1],
-            [1.1,1,1,1,0]]
-        )
-        M = M/M.max()
-        self.M = torch.from_numpy(M)
-
-    def forward(self, probs, target):
-        preds = self.normalization(probs)
-        loss = cost_sensitive_loss(preds, target, self.M)
-        if self.reduction == 'none':
-            return loss
-        elif self.reduction == 'mean':
-            return loss.mean()
-        elif self.reduction == 'sum':
-            return loss.sum()
-        else:
-            raise ValueError('\'reduction\' should be among mean, sum, none.')
-
 class StratifiedBatchSampler:
     """Stratified batch sampling
     Provides equal representation of target classes in each batch
@@ -122,19 +73,19 @@ if __name__ == "__main__":
     train_dataset = Dataset(args.train_data, tokenizer=tokenizer, label=True)
     y = torch.from_numpy(train_dataset.data.loc[:,'Category'].values)
     sampler = StratifiedBatchSampler(y, args.batch_size)
-    # train_loader = DataLoader(dataset=train_dataset, collate_fn=PadBatch(), batch_sampler= sampler)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=PadBatch())
+    train_loader = DataLoader(dataset=train_dataset, collate_fn=PadBatch(), batch_sampler= sampler)
+    # train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=PadBatch())
 
     print('Loading validation dataset...')
     valid_dataset = Dataset(args.valid_data, tokenizer=tokenizer, label=True)
     valid_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, collate_fn=PadBatch())
     
     print('Building model...')
-    model = model(args, vocab_size=tokenizer.get_vocab_size() + 1)
+    # todo
+    model = model(args, vocab_size=tokenizer.get_vocab_size() + 1, sentence_size= tokenizer.get_sentence_size() + 1)
     model = model.to(args.device)
 
     # Ignore annotators labeling which is -1
-#     criterion = CostSensitiveLoss(exp=1, reduction='mean')
     criterion = nn.CrossEntropyLoss(reduction='mean')
     optimizer = Adam(model.parameters(), lr=args.lr)
 
@@ -150,7 +101,8 @@ if __name__ == "__main__":
             model.zero_grad()
 
             # Move the parameters to device given by argument
-            x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
+            # todo
+            w, s, lw, ls, y = w.to(args.device), s.to(args.device), lw.to(args.device), ls.to(args.device), y.to(args.device)
             pred = model(x, lens)
 
             # Calculate loss of annotators' labeling
@@ -173,7 +125,8 @@ if __name__ == "__main__":
             valid_cm = np.zeros(shape= (5,5)) # confusion matrix for validation set
             model.eval()
             for x, y, lens in valid_loader:
-                x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
+                w, s, lw, ls, y = w.to(args.device), s.to(args.device), lw.to(args.device), ls.to(args.device), y.to(args.device)
+                # todo
                 pred = model(x, lens)
                 pred = torch.argmax(pred, dim=1)
                 valid_correct += torch.sum(torch.eq(pred, y)).item()
