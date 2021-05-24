@@ -23,7 +23,10 @@ class Tokenizer():
         
     def get_vocab_size(self):
         return len(self.dict) + 1
-
+    
+    def get_sentenct_size(self):
+        return len(self.sentence_dict) + 1 
+    
     def tokenize(self, sentence):
        
         sentence_tokens = list(map(lambda x:self.sentence_dict[x] if x in self.sentence_dict else len(self.sentence_dict) , sent_tokenize(sentence)))
