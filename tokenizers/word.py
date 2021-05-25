@@ -10,7 +10,7 @@ class Tokenizer():
     def __init__(self, args):
         with open(args.dict, 'r') as f:
             words = f.read().splitlines()
-            self.dict = {word: idx for idx, word in enumerate(words)}
+            self.dict = {word: (idx+1) for idx, word in enumerate(words)}
             
             self.k = args.k
             
