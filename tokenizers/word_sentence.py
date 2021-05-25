@@ -1,5 +1,8 @@
 from nltk.tokenize import sent_tokenize
 from nltk.tokenize import TreebankWordTokenizer
+import nltk
+nltk.download('punkt')
+
 
 def add_tokenizer_args(parser):
     group = parser.add_argument_group('tokenizer')
@@ -22,14 +25,14 @@ class Tokenizer():
         self.word_tokenizer = TreebankWordTokenizer()
         
     def get_vocab_size(self):
-        return len(self.dict) + 1
+        return len(self.word_dict) + 1
     
-    def get_sentenct_size(self):
+    def get_sentence_size(self):
         return len(self.sentence_dict) + 1 
     
     def tokenize(self, sentence):
        
         sentence_tokens = list(map(lambda x:self.sentence_dict[x] if x in self.sentence_dict else len(self.sentence_dict) , sent_tokenize(sentence)))
-        word_tokens = list(map(lambda x:self.word_dict[x] if x in self.word_dict else len(self.word_dict), self.word_tokenizer(sentence)))
+        word_tokens = list(map(lambda x:self.word_dict[x] if x in self.word_dict else len(self.word_dict), self.word_tokenizer.tokenize(sentence)))
         
         return word_tokens, sentence_tokens
