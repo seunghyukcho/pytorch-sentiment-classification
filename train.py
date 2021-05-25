@@ -20,6 +20,17 @@ from sklearn.model_selection import StratifiedKFold
 # confusion matrix
 from sklearn.metrics import confusion_matrix
 
+
+# convolution function of confusion matrix --> precisions, accuracy
+def convolution(cm):
+    eps = 1e-6
+    rec = np.diag(cm)/(cm.sum(axis=1)+eps)
+    prec = np.diag(cm)/(cm.sum(axis=0)+eps)
+#   prec = np.diag(cm/cm.sum(axis=1))
+    acc = np.diag(cm).sum()/np.sum(cm)
+    return prec, rec ,acc
+
+
 class StratifiedBatchSampler:
     """Stratified batch sampling
     Provides equal representation of target classes in each batch
@@ -110,7 +121,7 @@ if __name__ == "__main__":
         train_correct = 0
         train_cm = np.zeros(shape=(5,5)) # confusion matrix
         model.train()
-        for x, y, lens in train_loader:
+        for w, s, lw, ls, y in train_loader:
             model.zero_grad()
 
             # Move the parameters to device given by argument
@@ -137,17 +148,18 @@ if __name__ == "__main__":
             valid_correct = 0
             valid_cm = np.zeros(shape= (5,5)) # confusion matrix for validation set
             model.eval()
-            for x, y, lens in valid_loader:
+            for w, s, lw, ls, y in valid_loader:
                 w, s, lw, ls, y = w.to(args.device), s.to(args.device), lw.to(args.device), ls.to(args.device), y.to(args.device)
                 # todo
                 pred = model(w, s, lw, ls, False)
                 pred = torch.argmax(pred, dim=1)
                 valid_correct += torch.sum(torch.eq(pred, y)).item()
                 valid_cm += confusion_matrix( y.cpu().numpy(), pred.cpu().numpy(), labels=[0,1,2,3,4])
-        
+
+
         prec_tr, rec_tr, acc_tr = convolution(train_cm)
         prec_val, rec_val, acc_val = convolution(valid_cm)
-        
+
         print(
             f'Epoch: {(epoch + 1):4d} | '
             f'Train Loss: {train_loss:.3f} | '
