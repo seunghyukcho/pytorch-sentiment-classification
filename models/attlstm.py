@@ -1,5 +1,5 @@
 from torch import nn
-
+import torch
 
 def add_model_args(parser):
     group = parser.add_argument_group('model')
@@ -34,8 +34,8 @@ class Model(nn.Module):
         # AE structure
         self.Wt = nn.Linear(self.embd_dim, self.k)
         self.softmax = nn.Softmax(dim=1)
-        self.T = nn.Parameter(torch.randn((self.k,self.emb_dim), requires_grad=True))
-        self.Wa = nn.Parameter(torch.randn((self.emb_dim,self.emb_dim), requires_grad=True))
+        self.T = nn.Parameter(torch.randn((self.k,self.embd_dim), requires_grad=True))
+        self.Wa = nn.Parameter(torch.randn((self.embd_dim,self.embd_dim), requires_grad=True))
         self.tanh = nn.Tanh()
         
         # decoder
@@ -52,12 +52,17 @@ class Model(nn.Module):
         # 2) sentence --> Auto encoder
         w, s = torch.mean(w, dim=1), torch.mean(s, dim=1) # w, s: (batch, self.embd_dim)
         c_s = (w+s)/2.0 # AVERAGE, captures both target information and context information. (batch, self.embd_dim)
-        q_t = self.softmax(self.Wt(cs)) # (batch, self.k)
+        q_t = self.softmax(self.Wt(c_s)) # (batch, self.k)
         t_s = q_t@self.T # (batch, self.k) (self.k, self.embd_dim) = (batch, self.embd_dim)
         # t_s = (self.T.T@q_t.unsqueeze(-1)).squeeze() # (embd_dim, k) (batch, k, 1) = (batch, self.embd_dim)
 
         # (batch,n,self.embd_dim) (self.embd_dim, self.embd_dim) = (batch, n, self.embd_dim)
-        d = self.tanh((h@(self.Wa)@(t_s.unsqueeze(-1))))  # (batch, n, self.embd_dim) (batch, self.embd_dim,1) != (batch, n, 1)
+        # print(f'h\'s shape: {h.shape}')
+        # print(f'Wa\'s shape: {self.Wa.shape}')
+        d = h@(self.Wa)
+        # print(f'h@self.Wa\'s shape: {d.shape}')
+        # print(f't_s.unsqueeze(-1) shape: {t_s.unsqueeze(-1).shape}')
+        d = self.tanh((d@(t_s.unsqueeze(-1))))  # (batch, n, self.embd_dim) (batch, self.embd_dim,1) != (batch, n, 1)
         p = self.softmax(d) # (batch, n, 1)
 
         # obtain sentence representation
