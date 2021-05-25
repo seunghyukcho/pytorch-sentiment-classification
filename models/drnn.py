@@ -9,9 +9,12 @@ def add_model_args(parser):
             help='Number of layers')
     group.add_argument('--embd_dim', type=int, default=1,
             help='Embedding dimension')
-    group.add_argument('--k', type=int, default=15,
+    group.add_argument('--K', type=int, default=15,
             help='window size')
-    
+    group.add_argument('--glove_embd', type=str,
+            help='directory to embdding matrix')
+
+
 class Model(nn.Module):
     def __init__(self, args, vocab_size):
         super().__init__()
@@ -20,9 +23,12 @@ class Model(nn.Module):
         self.n_layers = args.n_layers
         self.n_classes = args.n_classes
         self.embd_dim = args.embd_dim
-        self.k = args.k 
+        self.k = args.K 
 
-        self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0)
+
+        t = torch.load(args.glove_embd)
+        self.embd = nn.Embedding.from_pretrained(t, freeze=True, padding_idx=0)
+        # self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0)
         self.rnn = nn.GRU(self.embd_dim, self.n_hids, self.n_layers, batch_first=True, dropout= 0.2)
         # self.drop = nn.Dropout(p=0.2)
         self.mlp = nn.Sequential(
