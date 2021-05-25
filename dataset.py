@@ -29,7 +29,7 @@ class PadBatch:
         self.inference = inference
 
     def __call__(self, batch):
-        words, sentences, lens = [], [], []
+        words, sentences, lens_word, lens_sentence = [], [], [], []
         if self.inference:
             for word, sentence in batch:
                 words.append(torch.LongTensor(word))
@@ -42,7 +42,7 @@ class PadBatch:
             for item in batch:
                 word, sentence, y = item
                 words.append(torch.LongTensor(word))
-                sentences.append(torch.LongTensor(sentences))
+                sentences.append(torch.LongTensor(sentence))
                 lens_word.append(len(word))
                 lens_sentence.append(len(sentence))
                 labels.append(y)
