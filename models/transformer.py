@@ -15,8 +15,6 @@ def add_model_args(parser):
             help='Embedding dimension')
     group.add_argument('--glove_embd', type=str,
             help='directory to embdding matrix')
-    group.add_argument('--dropout', type=float,
-            help='dropout prob to positional encoding')
     
 class PositionalEncoding(nn.Module):
 
@@ -45,13 +43,15 @@ class Model(nn.Module):
         self.n_heads = args.n_heads
         self.n_classes = args.n_classes
         self.embd_dim = args.embd_dim
-        self.dropout = args.dropout
+        # self.dropout = args.dropout
 #         self.embd = nn.Embedding(vocab_size, self.embd_dim, padding_idx=0)
-        self.pos_encoder = PositionalEncoding(self.n_hids, self.dropout)
+        # self.pos_encoder = PositionalEncoding(self.n_hids, self.dropout)
+        self.pos_encoder = PositionalEncoding(self.n_hids)
         t = torch.load(args.glove_embd)
-        self.embd = nn.Embedding.from_pretrained(t, freeze=True, padding_idx=0)
-        self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embd_dim, nhead=self.n_heads, dim_feedforward=self.n_hids, batch_first= True)
-        self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.n_layers)
+        self.embd = nn.Embedding.from_pretrained(t, freeze=False, padding_idx=0)
+        self.encoder_norm = nn.LayerNorm(self.embd_dim)
+        self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embd_dim, nhead=self.n_heads, dim_feedforward=self.n_hids)
+        self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.n_layers, norm= self.encoder_norm)
         self.decoder = nn.Linear(self.embd_dim, self.n_classes)
         
     def forward(self, x, lens):
