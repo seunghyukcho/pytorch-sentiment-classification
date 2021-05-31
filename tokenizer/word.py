@@ -10,6 +10,9 @@ class Tokenizer():
             words = f.read().splitlines()
             self.dict = {word: idx + 1 for idx, word in enumerate(words)}
 
+    def get_pad_token_id(self):
+        return 0
+
     def get_vocab_size(self):
         return len(self.dict) + 1
 

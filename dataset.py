@@ -24,9 +24,10 @@ class Dataset(data.Dataset):
 
 
 class PadBatch:
-    def __init__(self, inference=False):
+    def __init__(self, pad_token_id, inference=False):
         super(PadBatch, self).__init__()
         self.inference = inference
+        self.pad_token_id = pad_token_id
 
     def __call__(self, batch):
         sentences, lens = [], []
@@ -34,7 +35,7 @@ class PadBatch:
             for item in batch:
                 sentences.append(torch.LongTensor(item))
                 lens.append(len(item))
-            return pad_sequence(sentences, batch_first=True), torch.LongTensor(lens)
+            return pad_sequence(sentences, batch_first=True, padding_value=self.pad_token_id), torch.LongTensor(lens)
         else:
             labels = []
             for item in batch:
@@ -42,5 +43,5 @@ class PadBatch:
                 sentences.append(torch.LongTensor(x))
                 lens.append(len(x))
                 labels.append(y)
-            return pad_sequence(sentences, batch_first=True), torch.LongTensor(labels), torch.LongTensor(lens)
+            return pad_sequence(sentences, batch_first=True, padding_value=self.pad_token_id), torch.LongTensor(labels), torch.LongTensor(lens)
 
