@@ -24,7 +24,7 @@ if __name__ == "__main__":
     model = getattr(model_module, 'Model')
 
     tokenizer_name = task_parser.tokenizer
-    tokenizer_module = importlib.import_module(f'tokenizers.{tokenizer_name}')
+    tokenizer_module = importlib.import_module(f'tokenizer.{tokenizer_name}')
     tokenizer = getattr(tokenizer_module, 'Tokenizer')
 
     parser = argparse.ArgumentParser()
@@ -42,36 +42,40 @@ if __name__ == "__main__":
 
     print('Loading train dataset...')
     train_dataset = Dataset(args.train_data, tokenizer=tokenizer, label=True)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=PadBatch())
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=PadBatch(pad_token_id=tokenizer.get_pad_token_id()))
 
     print('Loading validation dataset...')
     valid_dataset = Dataset(args.valid_data, tokenizer=tokenizer, label=True)
-    valid_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, collate_fn=PadBatch())
+    valid_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, collate_fn=PadBatch(pad_token_id=tokenizer.get_pad_token_id()))
 
     print('Building model...')
     model = model(args, vocab_size=tokenizer.get_vocab_size() + 1)
     model = model.to(args.device)
 
-    # Ignore annotators labeling which is -1
-    criterion = nn.CrossEntropyLoss(reduction='mean')
+    criterion = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=args.lr)
 
     print('Start training!')
-    best_accuracy = 0
+    best_correct = 0
     writer = SummaryWriter(args.log_dir)
     for epoch in range(args.epochs):
         train_loss = 0.0
         train_correct = 0
+
         model.train()
         for x, y, lens in train_loader:
-            model.zero_grad()
+            optimizer.zero_grad()
 
             # Move the parameters to device given by argument
             x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
             pred = model(x, lens)
+            reg = 0
+            if type(pred) is tuple:
+                pred, reg = pred
 
             # Calculate loss of annotators' labeling
             loss = criterion(pred, y.view(-1))
+            loss = loss - reg
 
             # Update model weight using gradient descent
             loss.backward()
@@ -84,11 +88,18 @@ if __name__ == "__main__":
 
         # Validation
         with torch.no_grad():
+            valid_loss = 0
             valid_correct = 0
+
             model.eval()
             for x, y, lens in valid_loader:
                 x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
                 pred = model(x, lens)
+                # pred, _ = model(x, lens)
+                
+                loss = criterion(pred, y.view(-1))
+                valid_loss += loss.item() * x.size(0)
+                
                 pred = torch.argmax(pred, dim=1)
                 valid_correct += torch.sum(torch.eq(pred, y)).item()
 
@@ -96,6 +107,7 @@ if __name__ == "__main__":
             f'Epoch: {(epoch + 1):4d} | '
             f'Train Loss: {train_loss:.3f} | '
             f'Train Accuracy: {(train_correct / len(train_dataset)):.2f} | '
+            f'Valid Loss: {valid_loss / len(valid_dataset):.3f} | '
             f'Valid Accuracy: {(valid_correct / len(valid_dataset)):.2f}'
         )
 
@@ -106,8 +118,8 @@ if __name__ == "__main__":
             writer.add_scalar('valid_accuracy', valid_correct / len(valid_dataset), epoch)
 
         # Save the model with highest accuracy on validation set
-        if best_accuracy < valid_correct:
-            best_accuracy = valid_correct
+        if best_correct < valid_correct:
+            best_correct = valid_correct
             checkpoint_dir = Path(args.save_dir)
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
             torch.save({

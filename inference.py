@@ -29,11 +29,11 @@ if __name__ == "__main__":
     model_name = config.model
     model_module = importlib.import_module(f'models.{model_name}')
     tokenizer_name = config.tokenizer
-    tokenizer_module = importlib.import_module(f'tokenizers.{tokenizer_name}')
+    tokenizer_module = importlib.import_module(f'tokenizer.{tokenizer_name}')
     tokenizer = getattr(tokenizer_module, 'Tokenizer')(config)
 
     test_dataset = Dataset(args.test_data, tokenizer=tokenizer)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=PadBatch(inference=True))
+    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=PadBatch(pad_token_id=tokenizer.get_pad_token_id(), inference=True))
 
     model = getattr(model_module, 'Model')(config, vocab_size=tokenizer.get_vocab_size() + 1)
     model.load_state_dict(ckpt['model'])
@@ -45,6 +45,8 @@ if __name__ == "__main__":
         for x, lens in tqdm(test_loader):
             x, lens = x.to(args.device), lens.to(args.device)
             pred = model(x, lens)
+            if type(pred) is tuple:
+                pred, _ = pred
             pred = torch.argmax(pred, dim=1)
             preds = torch.cat([preds, pred], dim=0)
         
