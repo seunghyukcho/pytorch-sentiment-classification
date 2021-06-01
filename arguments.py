@@ -1,7 +1,7 @@
 import argparse
 
 models = ['rnn','lstm','drnn','transformer']
-tokenizers = ['char', 'word','word_sentence','word_tree']
+tokenizers = ['char', 'word','nltk_tree','nltk_word','nltk_sentence_and','nltk_sentence_comma']
 
 
 def get_task_parser():
