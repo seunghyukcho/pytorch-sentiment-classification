@@ -94,8 +94,10 @@ if __name__ == "__main__":
             model.eval()
             for x, y, lens in valid_loader:
                 x, y, lens = x.to(args.device), y.to(args.device), lens.to(args.device)
+
                 pred = model(x, lens)
-                # pred, _ = model(x, lens)
+                if type(pred) is tuple:
+                    pred, _ = pred
                 
                 loss = criterion(pred, y.view(-1))
                 valid_loss += loss.item() * x.size(0)
