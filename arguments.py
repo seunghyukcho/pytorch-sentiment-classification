@@ -29,7 +29,7 @@ def add_train_args(parser):
                        help="Root directory of validation data.")
     group.add_argument('--n_classes', type=int, default=5,
                        help="Number of classes.")
-    group.add_argument('--device', type=str, choices=['cpu', 'cuda'],
+    group.add_argument('--device', type=str, default='cpu',
                        help="Device going to use for training.")
     group.add_argument('--save_dir', type=str, default='checkpoints/',
                        help="Folder going to save model checkpoints.")
@@ -45,7 +45,7 @@ def add_test_args(parser):
                        help="Number of instances in a batch.")
     group.add_argument('--test_data', type=str,
                        help="Root directory of test data.")
-    group.add_argument('--device', type=str, choices=['cpu', 'cuda'],
+    group.add_argument('--device', type=str, default='cpu',
                        help="Device going to use for training.")
     group.add_argument('--ckpt_dir', type=str,
                        help="Directory which contains the checkpoint and args.json.")
