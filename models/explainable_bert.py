@@ -85,7 +85,9 @@ class Model(nn.Module):
                     span_mask.append(1e6)
             span_masks.append(span_mask)
 
-        start_indices, end_indices, span_masks = torch.LongTensor(start_indices).cuda(), torch.LongTensor(end_indices).cuda(), torch.LongTensor(span_masks).cuda()
+        start_indices, end_indices, span_masks = torch.cuda.LongTensor(start_indices, device='cuda:1'), torch.cuda.LongTensor(end_indices, device='cuda:1'), torch.cuda.LongTensor(span_masks, device='cuda:1')
+
+        # print(start_indices, end_indices, span_masks)
 
         attention_mask = (x != 1).long()
         hidden_states, _ = self.encoder(x, attention_mask=attention_mask)  # output.shape = (bs, length, hidden_size)
@@ -94,5 +96,5 @@ class Model(nn.Module):
         out = self.output(H)
 
         reg_loss = a_ij.pow(2).sum(dim=1).mean()
-        return out, reg_loss
+        return out, 0.01 * reg_loss
 
